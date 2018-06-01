@@ -22,10 +22,7 @@ definition(
     iconUrl: "https://airscapefans.com/images/site/airscape_logo.png",
     iconX2Url: "https://airscapefans.com/images/site/airscape_logo.png",
     iconX3Url: "https://airscapefans.com/images/site/airscape_logo.png")
-	//iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
-    //iconX3Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png")
-
-
+	
 preferences {
 	page(name: "Fan Info", title: "Tell me about the fan", nextPage: "autoStartPage", uninstall: true ) {
 		section("Basic Fan info") {
@@ -42,6 +39,8 @@ def autoStartPage() {
     	section("Automatic Startup") {
         	paragraph "Automatically start the fan when outside temperature is less than the inside temperature" 
             input name: "autoStartFan", type: "bool", title: "Enable auto start"
+            input name: "outsideTempSensor", type: "capability.temperatureMeasurement", title: "select Outside temp sensor", hideWhenEmpty: true, multiple: false
+            input name: "insideTempSensor", type: "capability.temperatureMeasurement", title: "select Inside temp sensor", hideWhenEmpty: true, multiple: false
             input name: "minOpenWindows", type: "number", title: "Number of open windows to start fan", hideWhenEmpty: "windowWatchList"
             input name: "windowWatchList", type: "capability.contactSensor", title: "Select open windows to watch", hideWhenEmpty: true, multiple: true
             input "autoStartMode", "mode" , title: "Run during specific mode", multiple: true
@@ -94,7 +93,7 @@ def updated() {
 
 def initialize() {
 	if( settings.autoSpeedFan ) runEvery30Minutes(autoSpeedAdjust)
-    subscribe(getChildDevice(convertIPtoHex(settings.ipAddress)), "outsideTemp", autoOnOff)
+    subscribe(outsideTempSensor, "temperature", autoOnOff)
     subscribe(windowWatchList, "contact", autoOnOff)
 }
 
@@ -108,9 +107,9 @@ def autoSpeedAdjust() {
     	log.debug "autoSpeedAdjust fan not running... exit"
     }
     else {
-    	def outsideTemp = childWHF.currentValue("outsideTemp").toInteger()
-    	def insideTemp = childWHF.currentValue("insideTemp").toInteger()
-        def tempDiff = childWHF.currentValue("insideTemp").toInteger() - childWHF.currentValue("outsideTemp").toInteger()
+    	def outsideTemp = outsideTempSensor.currentTemperature
+    	def insideTemp = insideTempSensor.currentTemperature
+        def tempDiff = insideTemp - ousideTemp
         def currentSpeed = childWHF.currentValue("fanSpeed").toInteger()
 
     	if( autoSpeedMode.contains(location.currentMode) ) {
@@ -145,13 +144,19 @@ def autoOnOff(evt) {
         return
     }
     
-    def outsideTemp = childWHF.currentValue("outsideTemp").toInteger()
-    def insideTemp = childWHF.currentValue("insideTemp").toInteger()
-    
+    def outsideTemp = outsideTempSensor.currentTemperature
+    def insideTemp = insideTempSensor.currentTemperature
+        
     if( childWHF.currentValue("switch") == "on" && settings.autoStopFan ) {
     	if( outsideTemp >= insideTemp ) {
         	log.debug "autoOnOff is turing off the fan"
             sendNotificationEvent("Based on your auto stop preferences, the whole house fan is turning off")
+        	childWHF.off()
+            return
+        }
+        if( insideTemp <= settings.autoStopLowTemp ) {
+        	log.debug "autoOnOff is turing off the fan because of low temp shutoff"
+            sendNotificationEvent("The inside temperature is below the minimum inside temperature, the whole house fan is turning off")
         	childWHF.off()
             return
         }
@@ -160,7 +165,7 @@ def autoOnOff(evt) {
     	if( outsideTemp < insideTemp && insideTemp > settings.autoStopLowTemp ) {
         	if( windowsOpenGo() && autoStartMode.contains(location.currentMode) ) {
             	log.debug "autoOnOff starting fan becuase all conditions met"
-                sendNotificationEvent("the Whole House Fan is starting because its cooler outside.")
+                sendNotificationEvent("The Whole House Fan is starting because its cooler outside.")
         		childWHF.on()
             }
             else {
@@ -168,7 +173,7 @@ def autoOnOff(evt) {
             }
         }
         else {
-        	log.debug "autoOnOff not starting because not cool enough outside"
+        	log.debug "autoOnOff not starting because not cool enough outside or too cold inside"
         }
     }
     else {
