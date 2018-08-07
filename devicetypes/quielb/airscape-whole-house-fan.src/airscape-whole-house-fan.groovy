@@ -118,7 +118,7 @@ def parse(String description) {
     }
     
     sensorMap.each { key, value ->
-      	if( value == null ) {
+      	if( value == null && valuesMap["${key}Temp"].toInteger() != -99 ) {
         	try {
         		sensorMap["${key}"] = 
             		addChildDevice("smartthings", "Temperature Sensor", "${device.deviceNetworkId}-${key}", location.hubs[0].getId(),
