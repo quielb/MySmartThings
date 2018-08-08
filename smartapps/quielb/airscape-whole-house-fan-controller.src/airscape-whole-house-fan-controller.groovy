@@ -109,7 +109,7 @@ def autoSpeedAdjust() {
     else {
     	def outsideTemp = outsideTempSensor.currentTemperature
     	def insideTemp = insideTempSensor.currentTemperature
-        def tempDiff = insideTemp - ousideTemp
+        def tempDiff = insideTemp - outsideTemp
         def currentSpeed = childWHF.currentValue("fanSpeed").toInteger()
 
     	if( autoSpeedMode.contains(location.currentMode) ) {
